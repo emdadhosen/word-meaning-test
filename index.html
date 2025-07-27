@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="bn" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Spelling Test App</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header class="topbar">
+    <h1>Spelling Test App</h1>
+    <div>
+      <button id="settingsBtn" class="theme-btn" title="Settings">⚙️</button>
+      <button id="themeToggle" class="theme-btn" title="Toggle Dark/Light">🌙</button>
+    </div>
+  </header>
+
+  <div class="container" id="manageArea">
+    <h2>📘 Create / Manage Word Sets</h2>
+
+    <div id="createSetArea">
+      <h3>🔤 Add New Entry</h3>
+      <input
+        type="text"
+        id="newWord"
+        placeholder="Base word (press Enter after meaning)"
+      />
+      <input
+        type="text"
+        id="newMeaning"
+        placeholder="Bangla meaning (press Enter to add)"
+      />
+      <ul id="currentEntries"></ul>
+
+      <input type="text" id="setName" placeholder="Set name" />
+      <button id="saveSetBtn">💾 Save Set</button>
+      <button id="updateSetBtn" class="hidden">✅ Update Set</button>
+      <button id="cancelEditBtn" class="hidden">✖️ Cancel</button>
+    </div>
+
+    <h3>📂 Saved Sets</h3>
+    <div id="savedSetsList"></div>
+    <button id="startTestBtn">▶️ Start Test</button>
+  </div>
+
+  <div class="container hidden" id="testArea">
+    <h2>📝 MCQ Test</h2>
+    <div id="question" class="question"></div>
+    <div id="options" class="options"></div>
+
+    <div class="scoreboard">
+      <span id="score">Score: 0</span>
+      <span id="pct">0%</span>
+    </div>
+
+    <button id="endTestBtn">⏹️ End Test</button>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="modal hidden">
+    <h3>⚙️ Settings</h3>
+    <label>
+      Correct Sound (.wav):
+      <input type="file" id="correctSoundInput" accept=".wav" />
+    </label>
+    <label>
+      Incorrect Sound (.wav):
+      <input type="file" id="incorrectSoundInput" accept=".wav" />
+    </label>
+    <button id="closeSettingsBtn">Close</button>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
