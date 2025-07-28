@@ -1,258 +1,221 @@
-// --- DOM References ---
-const htmlRoot         = document.documentElement;
-const themeToggle      = document.getElementById('themeToggle');
-const settingsBtn      = document.getElementById('settingsBtn');
-const settingsModal    = document.getElementById('settingsModal');
-const closeSettingsBtn = document.getElementById('closeSettingsBtn');
-const correctInput     = document.getElementById('correctSoundInput');
-const incorrectInput   = document.getElementById('incorrectSoundInput');
-
-const newWordIn     = document.getElementById('newWord');
-const newMeanIn     = document.getElementById('newMeaning');
-const entriesList   = document.getElementById('currentEntries');
-const setNameIn     = document.getElementById('setName');
-const saveSetBtn    = document.getElementById('saveSetBtn');
-const updateSetBtn  = document.getElementById('updateSetBtn');
-const cancelEditBtn = document.getElementById('cancelEditBtn');
-
-const savedSetsList = document.getElementById('savedSetsList');
-const startTestBtn  = document.getElementById('startTestBtn');
-const manageArea    = document.getElementById('manageArea');
-const testArea      = document.getElementById('testArea');
-
-const questionEl = document.getElementById('question');
-const optionsEl  = document.getElementById('options');
-const scoreEl    = document.getElementById('score');
-const pctEl      = document.getElementById('pct');
-const endTestBtn = document.getElementById('endTestBtn');
-
-const playWordBtn = document.getElementById('playWordBtn');
-
-// --- State & Audio ---
-let entries        = [];
-let editingSet     = null;
-let pool           = [];
-let idx            = 0;
-let correct        = 0;
-let wrong          = 0;
-let correctAudio   = null;
-let incorrectAudio = null;
-
-// --- Theme Persistence ---
-const THEME_KEY = 'spellingAppTheme';
-function applyTheme(theme) {
-  htmlRoot.setAttribute('data-theme', theme);
-  themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
-  localStorage.setItem(THEME_KEY, theme);
-}
-themeToggle.onclick = () => {
-  applyTheme(htmlRoot.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-};
-applyTheme(localStorage.getItem(THEME_KEY) || 'light');
-
-// --- Settings Modal Logic ---
-settingsBtn.onclick      = () => settingsModal.classList.remove('hidden');
-closeSettingsBtn.onclick = () => settingsModal.classList.add('hidden');
-
-correctInput.onchange = e => {
-  const file = e.target.files[0];
-  if (file) correctAudio = new Audio(URL.createObjectURL(file));
-};
-incorrectInput.onchange = e => {
-  const file = e.target.files[0];
-  if (file) incorrectAudio = new Audio(URL.createObjectURL(file));
-};
-
-// --- Storage Helpers ---
-function storageKey(name) {
-  return 'wordset_' + name;
-}
-function getSetNames() {
-  return Object.keys(localStorage)
-    .filter(k => k.startsWith('wordset_'))
-    .map(k => k.replace('wordset_', ''));
+/* Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-// --- Utilities ---
-function shuffle(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-function speak(word) {
-  const u = new SpeechSynthesisUtterance(word);
-  u.lang = 'en-US';
-  speechSynthesis.speak(u);
+body {
+  font-family: 'Poppins', sans-serif;
+  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+  color: #333;
+  min-height: 100vh;
+  padding: 40px 20px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
 }
 
-// --- Render Current Entries ---
-function renderCurrentEntries() {
-  entriesList.innerHTML = '';
-  entries.forEach((e, i) => {
-    const li = document.createElement('li');
-    li.textContent = `${e.word} — ${e.meaning}`;
-    const btn = document.createElement('button');
-    btn.textContent = '✖';
-    btn.onclick = () => {
-      entries.splice(i, 1);
-      renderCurrentEntries();
-    };
-    li.appendChild(btn);
-    entriesList.appendChild(li);
-  });
+.container {
+  background: #fff;
+  padding: 30px 40px;
+  border-radius: 12px;
+  max-width: 640px;
+  width: 100%;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+  /* Ensure container doesn't cut off content */
+  overflow: visible;
 }
 
-// --- Render Saved Sets ---
-function renderSavedSets() {
-  savedSetsList.innerHTML = '';
-  const names = getSetNames();
-  if (!names.length) {
-    savedSetsList.textContent = 'No saved sets yet.';
-    return;
-  }
-  names.forEach(name => {
-    const row = document.createElement('div');
-    row.className = 'saved-set';
-
-    const div = document.createElement('div');
-    const radio = document.createElement('input');
-    radio.type = 'radio';
-    radio.name = 'setSelect';
-    radio.value = name;
-    radio.id = 'r_' + name;
-    const lbl = document.createElement('label');
-    lbl.htmlFor = radio.id;
-    lbl.textContent = name;
-    div.append(radio, lbl);
-
-    const editBtn = document.createElement('button');
-    editBtn.textContent = '✏️';
-    editBtn.onclick = () => loadSetForEdit(name);
-
-    const renameBtn = document.createElement('button');
-    renameBtn.textContent = '✏ rename';
-    renameBtn.onclick = () => renameSet(name);
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.textContent = '🗑️';
-    deleteBtn.className = 'delete';
-    deleteBtn.onclick = () => deleteSet(name);
-
-    row.append(div, editBtn, renameBtn, deleteBtn);
-    savedSetsList.appendChild(row);
-  });
+h2, h3 {
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 24px;
+  text-align: center;
 }
 
-// --- CRUD: Sets ---
-function loadSetForEdit(name) {
-  const data = JSON.parse(localStorage.getItem(storageKey(name)));
-  entries = data.entries.slice();
-  editingSet = name;
-  setNameIn.value = name;
-  saveSetBtn.classList.add('hidden');
-  updateSetBtn.classList.remove('hidden');
-  cancelEditBtn.classList.remove('hidden');
-  renderCurrentEntries();
+.input-pair {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
-function renameSet(oldName) {
-  const newName = prompt('New name:', oldName);
-  if (!newName || newName === oldName) return;
-  if (localStorage.getItem(storageKey(newName))) {
-    alert('Name taken.');
-    return;
-  }
-  const payload = localStorage.getItem(storageKey(oldName));
-  localStorage.setItem(storageKey(newName), payload);
-  localStorage.removeItem(storageKey(oldName));
-  renderSavedSets();
+input[type="text"] {
+  flex: 1;
+  padding: 14px 18px;
+  font-size: 16px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  outline-color: transparent;
+  transition: border-color 0.3s ease;
 }
 
-function deleteSet(name) {
-  if (!confirm(`Are you sure you want to delete set “${name}”?`)) return;
-  localStorage.removeItem(storageKey(name));
-  renderSavedSets();
+input[type="text"]:focus {
+  border-color: #2575fc;
+  outline-color: #2575fc;
+  box-shadow: 0 0 8px rgba(37, 117, 252, 0.5);
 }
 
-// --- Save / Update Handlers ---
-saveSetBtn.onclick = () => {
-  const name = setNameIn.value.trim();
-  if (!name) return alert('Enter set name.');
-  if (!entries.length) return alert('Add entries.');
-  if (localStorage.getItem(storageKey(name))) {
-    alert('Name taken.');
-    return;
-  }
-  localStorage.setItem(storageKey(name), JSON.stringify({ entries }));
-  entries = [];
-  setNameIn.value = '';
-  renderCurrentEntries();
-  renderSavedSets();
-};
+ul {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 24px;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fafafa;
+}
 
-updateSetBtn.onclick = () => {
-  const name = setNameIn.value.trim();
-  if (!name) return alert('Name required.');
-  if (!entries.length) return alert('Add entries.');
-  if (name !== editingSet && localStorage.getItem(storageKey(name))) {
-    alert('Name taken.');
-    return;
-  }
-  if (name !== editingSet) {
-    localStorage.removeItem(storageKey(editingSet));
-  }
-  localStorage.setItem(storageKey(name), JSON.stringify({ entries }));
-  editingSet = null;
-  entries = [];
-  setNameIn.value = '';
-  saveSetBtn.classList.remove('hidden');
-  updateSetBtn.classList.add('hidden');
-  cancelEditBtn.classList.add('hidden');
-  renderCurrentEntries();
-  renderSavedSets();
-};
+ul li {
+  background: #fff;
+  margin: 6px 10px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 500;
+}
 
-cancelEditBtn.onclick = () => {
-  editingSet = null;
-  entries = [];
-  setNameIn.value = '';
-  saveSetBtn.classList.remove('hidden');
-  updateSetBtn.classList.add('hidden');
-  cancelEditBtn.classList.add('hidden');
-  renderCurrentEntries();
-};
+.save-section {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 32px;
+}
 
-// --- Add Entry on Enter Key ---
-newMeanIn.addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    const w = newWordIn.value.trim();
-    const m = newMeanIn.value.trim();
-    if (!w || !m) return alert('Both word + meaning required.');
-    entries.push({ word: w, meaning: m });
-    newWordIn.value = '';
-    newMeanIn.value = '';
-    renderCurrentEntries();
-  }
-});
+button {
+  background: #2575fc;
+  color: white;
+  padding: 12px 18px;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  user-select: none;
+}
 
-// --- Start Test (MCQ) ---
-startTestBtn.onclick = () => {
-  const sel = document.querySelector('input[name="setSelect"]:checked');
-  if (!sel) return alert('Select a set.');
-  const data = JSON.parse(localStorage.getItem(storageKey(sel.value)));
-  pool = shuffle(data.entries.slice());
-  idx = 0;
-  correct = 0;
-  wrong = 0;
-  scoreEl.textContent = 'Score: 0';
-  pctEl.textContent   = '0%';
-  manageArea.classList.add('hidden');
-  testArea.classList.remove('hidden');
-  nextQuestion();
-};
+button:hover {
+  background: #1a54c4;
+}
 
-// --- MCQ Logic ---
-function nextQuestion()
+/* Saved set bar */
+.set-bar {
+  background: #f9f9f9;
+  padding: 14px 20px;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.set-name {
+  font-weight: bold;
+  color: #222;
+}
+
+/* Option button styles */
+.option-button {
+  font-weight: 700;
+  font-size: 16px;
+  padding: 14px 18px;
+  margin: 10px 0;
+  border-radius: 10px;
+  width: 100%;
+  text-align: left;
+  background-color: #f1f1f1;
+  border: 2px solid transparent;
+  color: #000;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  transition: background-color 0.3s ease, transform 0.2s ease, border 0.3s ease;
+  cursor: pointer;
+  user-select: none;
+}
+
+.option-button:hover {
+  background-color: #e0eaff;
+  transform: scale(1.01);
+}
+
+.option-button.correct {
+  background-color: #c8f7c5 !important;
+  color: #1b5e20 !important;
+  border: 2px solid #2e7d32 !important;
+}
+
+.option-button.wrong {
+  background-color: #ffd6d6 !important;
+  color: #b71c1c !important;
+  border: 2px solid #c62828 !important;
+}
+
+/* Options list styling */
+.options-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  max-height: none;  /* নিশ্চিত করবো কোন স্ক্রলবার না আসুক */
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.5);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+.modal-content {
+  background: #fff;
+  padding: 30px;
+  border-radius: 14px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.close-btn {
+  font-size: 26px;
+  font-weight: bold;
+  cursor: pointer;
+  color: #444;
+}
+
+.result-box {
+  margin-top: 30px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* MCQ question box fix to prevent overflow */
+#questionBox {
+  min-height: 60px;
+  font-weight: 700;
+  font-size: 20px;
+  margin-bottom: 15px;
+}
+
+/* MCQ options container fix */
+#optionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 0;
+  margin: 0;
+}
