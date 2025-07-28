@@ -255,4 +255,4 @@ startTestBtn.onclick = () => {
 };
 
 // --- MCQ Logic ---
-function nextQuestion
+function nextQuestion()
